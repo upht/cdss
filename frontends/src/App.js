@@ -266,17 +266,29 @@ function App() {
   };
 
   const getStatusColor = (prediction) => {
-    if (prediction === 'Osteoporosis') return 'var(--danger)';
-    if (prediction === 'Osteopenia') return 'var(--warning)';
-    return 'var(--success)';
+    if (!prediction) return 'var(--text-secondary)';
+    const p = prediction.toLowerCase();
+    if (p.includes('osteoporosis')) return 'var(--danger)';
+    if (p.includes('osteopenia')) return 'var(--warning)';
+    if (p.includes('normal')) return 'var(--success)';
+    return 'var(--text-secondary)';
   };
 
   const getChartData = () => {
     if (!stats) return [];
+    // Normalize summary keys to Title Case
+    const normalizedSummary = { 'Normal': 0, 'Osteopenia': 0, 'Osteoporosis': 0 };
+    Object.keys(stats.summary).forEach(key => {
+      const normalizedKey = key.charAt(0).toUpperCase() + key.slice(1).toLowerCase();
+      if (normalizedSummary.hasOwnProperty(normalizedKey)) {
+        normalizedSummary[normalizedKey] += stats.summary[key];
+      }
+    });
+
     return [
-      { name: 'Normal', value: stats.summary['Normal'] || 0, color: 'var(--success)' },
-      { name: 'Osteopenia', value: stats.summary['Osteopenia'] || 0, color: 'var(--warning)' },
-      { name: 'Osteoporosis', value: stats.summary['Osteoporosis'] || 0, color: 'var(--danger)' }
+      { name: 'Normal', value: normalizedSummary['Normal'], color: 'var(--success)' },
+      { name: 'Osteopenia', value: normalizedSummary['Osteopenia'], color: 'var(--warning)' },
+      { name: 'Osteoporosis', value: normalizedSummary['Osteoporosis'], color: 'var(--danger)' }
     ];
   };
 
