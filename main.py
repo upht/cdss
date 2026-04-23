@@ -441,7 +441,7 @@ async def trigger_retraining():
     if supabase:
         return {"error": "Model Retraining from Web currently handles local folder structure. Data synced in Supabase."}
     try:
-        script_path = r"c:\Users\L\Desktop\Normal-20260423T020516Z-3-001\train_model.py"
+        script_path = r"train_model.py"
         result = subprocess.run([sys.executable, script_path], capture_output=True, text=True)
         if result.returncode == 0:
             return {"status": "success", "message": "Model trained successfully.", "logs": result.stdout}
