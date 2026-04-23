@@ -226,13 +226,20 @@ async def get_patient_data(patient_id: str):
                 return {"error": "Patient not found in Local CSV"}
                 
             img_path = patient_rows.iloc[0]['image_path']
+            # Robust extraction of filename from Windows OR Linux paths
+            filename = re.split(r'[\\/]', img_path)[-1]
+            
             # If path was saved as absolute Windows path, try to resolve it relatively
             if not os.path.exists(img_path):
                 # Fallback: check if it's in the current project structure
-                fname = os.path.basename(img_path)
                 # Looking for LABEL/ID/fname
                 lbl = patient_rows.iloc[0]['label']
-                img_path = os.path.join(BASE_DIR, lbl, str(patient_id), fname)
+                img_path = os.path.join(BASE_DIR, lbl, str(patient_id), filename)
+            
+            # Double check if file exists after fallback
+            if not os.path.exists(img_path):
+                 # Try one more level: just search for the filename in the project
+                 return {"error": f"Image file not found at: {img_path}. Expected filename: {filename}"}
 
             with open(img_path, "rb") as image_file:
                 bg64_str = base64.b64encode(image_file.read()).decode('utf-8')
@@ -326,11 +333,13 @@ async def predict_risk(
                 if patient_rows.empty:
                     return {"error": "Patient ID not found in Local Database."}
                 img_path = patient_rows.iloc[0]['image_path']
+                # Robust extraction of filename from Windows OR Linux paths
+                filename = re.split(r'[\\/]', img_path)[-1]
+                
                 # Handle potential Windows absolute paths
                 if not os.path.exists(img_path):
-                     fname = os.path.basename(img_path)
                      lbl = patient_rows.iloc[0]['label']
-                     img_path = os.path.join(BASE_DIR, lbl, str(patient_id), fname)
+                     img_path = os.path.join(BASE_DIR, lbl, str(patient_id), filename)
                 img = cv2.imread(img_path)
                 if img is None:
                     return {"error": "Failed to load local image."}
