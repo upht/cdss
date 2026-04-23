@@ -5,7 +5,7 @@ import tempfile
 import os
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
-import easyocr
+# import easyocr (Moved to lazy-loading to avoid startup failure on Cloud)
 import re
 import uvicorn
 import pandas as pd
@@ -23,8 +23,8 @@ DATASET_CSV = os.path.join(BASE_DIR, "OsterporosisUpDataset.csv")
 
 # Load Envs for Cloud Compatibility (Supabase Integration)
 load_dotenv()
-SUPABASE_URL = os.environ.get("https://yjevprwtsvylltftjbld.supabase.co")
-SUPABASE_KEY = os.environ.get("sb_publishable_6qTixMdADM0g85sV-DuahQ__heLBJS5")
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 supabase: Client = None
 if SUPABASE_URL and SUPABASE_KEY:
@@ -52,8 +52,13 @@ _reader = None
 def get_reader():
     global _reader
     if _reader is None:
-        # Load only when needed to save base memory
-        _reader = easyocr.Reader(['en'], gpu=False)
+        try:
+            import easyocr
+            # Load only when needed to save base memory
+            _reader = easyocr.Reader(['en'], gpu=False)
+        except ImportError:
+            print("⚠️ EasyOCR not installed. OCR processing will fail if called.")
+            return None
     return _reader
 
 def clear_reader():
@@ -63,6 +68,8 @@ def clear_reader():
 
 def process_table(img_path):
     reader = get_reader()
+    if reader is None:
+        raise Exception("OCR Engine (EasyOCR) is not available on this server. Please use frontend OCR.")
     result = reader.readtext(img_path, detail=0)
     text_content = " ".join(result)
     
