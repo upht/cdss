@@ -95,11 +95,16 @@ def evaluate_who_criteria(min_t_score, age=None, gender=None, weight=None, heigh
     desc = ""
     rec = ""
     
-    if min_t_score >= -1.0:
+    try:
+        t = float(min_t_score)
+    except:
+        t = 0
+
+    if t >= -1.0:
         status = "Normal"
         desc = "ความหนาแน่นกระดูกปกติ (Normal)"
         rec = "ควรตรวจติดตามมวลกระดูกทุก 2-5 ปี"
-    elif -2.5 < min_t_score < -1.0:
+    elif -2.5 < t < -1.0:
         status = "Osteopenia"
         desc = "ภาวะกระดูกบาง (Osteopenia)"
         rec = "ควรปรึกษาแพทย์เพื่อพิจารณาการรับวิตามินดีและแคลเซียมเสริม"
