@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import './App.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://cdss-w8s6.onrender.com:8000';
+const API_URL = process.env.REACT_APP_API_URL || 'https://cdss-w8s6.onrender.com';
 
 const TScoreBar = ({ tScore }) => {
   const boundedScore = Math.min(Math.max(tScore, -5), 2);
