@@ -1,12 +1,13 @@
-fastapi
-uvicorn[standard]
-python-multipart
-easyocr
-opencv-python-headless
-pandas
-supabase
-python-dotenv
-scikit-learn
-scikit-image
-joblib
-requests
+--extra-index-url https://download.pytorch.org/whl/cpu
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+easyocr==1.7.2
+opencv-python-headless==4.10.0.84
+pandas==2.2.3
+supabase==2.11.0
+python-dotenv==1.0.1
+scikit-learn==1.6.0
+scikit-image==0.25.0
+joblib==1.4.2
+requests==2.32.3
