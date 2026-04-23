@@ -3,8 +3,8 @@ import csv
 import glob
 
 # Data source path
-base_path = r"c:\Users\L\Desktop\Normal-20260423T020516Z-3-001"
-output_csv = r"c:\Users\L\Desktop\Normal-20260423T020516Z-3-001\OsterporosisUpDataset.csv"
+base_path = r""
+output_csv = r"OsterporosisUpDataset.csv"
 
 # Classes
 classes = ["Normal", "Osteopenia", "Osteoporosis"]

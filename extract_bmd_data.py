@@ -155,7 +155,7 @@ def generate_csv(patient_path, rows, date="Unknown", site="Spine"):
                 writer.writerow({"date": "2023-12-22", "site": site, **row})
 
 def main():
-    base_path = r"c:\Users\L\Desktop\Normal-20260423T020516Z-3-001"
+    base_path = r""
     classes = ["Normal", "Osteopenia", "Osteoporosis"]
     
     print("Initialize EasyOCR Reader...")
