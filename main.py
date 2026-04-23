@@ -455,6 +455,9 @@ async def predict_risk(
                 image_dest_path = os.path.join(patient_dir, filename)
                 cv2.imwrite(image_dest_path, img)
 
+                # Save RELATIVE path in CSV for portability
+                relative_img_path = os.path.join(LABEL, str(patient_id), filename)
+
                 bmd_csv_path = os.path.join(patient_dir, "bmd_spine.csv")
                 bmd_df = pd.DataFrame(rows)
                 if 'Z_Score' not in bmd_df.columns:
@@ -463,11 +466,11 @@ async def predict_risk(
 
                 if str(patient_id) in main_df['patient_id'].astype(str).values:
                     main_df.loc[main_df['patient_id'].astype(str) == str(patient_id), 'label'] = LABEL
-                    main_df.loc[main_df['patient_id'].astype(str) == str(patient_id), 'image_path'] = image_dest_path
+                    main_df.loc[main_df['patient_id'].astype(str) == str(patient_id), 'image_path'] = relative_img_path
                 else:
                     new_record = pd.DataFrame([{
                         'patient_id': patient_id,
-                        'image_path': image_dest_path,
+                        'image_path': relative_img_path,
                         'label': LABEL
                     }])
                     main_df = pd.concat([main_df, new_record], ignore_index=True)

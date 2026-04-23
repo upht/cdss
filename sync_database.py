@@ -60,9 +60,9 @@ def sync():
                             # To be safe, we don't delete actual_folder if it exists, just update CSV
                         
                         # Update CSV Row
-                        new_img_path = os.path.join(new_folder, filename)
+                        relative_img_path = os.path.join(correct_label, pid, filename)
                         row['label'] = correct_label
-                        row['image_path'] = new_img_path
+                        row['image_path'] = relative_img_path
                         changes_count += 1
             except Exception as e:
                 print(f"  Error processing {pid}: {e}")
