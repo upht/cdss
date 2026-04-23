@@ -117,6 +117,7 @@ function App() {
   // Retraining state
   const [isRetraining, setIsRetraining] = useState(false);
   const [trainingLog, setTrainingLog] = useState(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
   // Clinical Inputs
   const [patientIdInput, setPatientIdInput] = useState('');
@@ -161,6 +162,8 @@ function App() {
     try {
       setLoading(true);
       setError(null);
+      setResult(null);
+      setSelectedImageIndex(0);
       const res = await axios.get(`${API_URL}/patient/${patientId}`);
       if (res.data.error) {
         setError(res.data.error);
@@ -434,6 +437,65 @@ function App() {
                      </div>
                   )}
                 </div>
+
+                {/* Multi-Image Gallery */}
+                {result.images && result.images.length > 0 && (
+                  <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
+                    <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--text-secondary)', textAlign: 'left' }}>🖼️ Patient Scan Gallery ({result.images.length} images)</h3>
+                    
+                    <div style={{ 
+                      position: 'relative', 
+                      background: 'rgba(0,0,0,0.4)', 
+                      borderRadius: '12px', 
+                      padding: '10px',
+                      border: '1px solid var(--border-color)',
+                      overflow: 'hidden'
+                    }}>
+                      <img 
+                        src={result.images[selectedImageIndex]} 
+                        alt={`Scan ${selectedImageIndex + 1}`}
+                        style={{ 
+                          maxWidth: '100%', 
+                          maxHeight: '500px', 
+                          borderRadius: '8px',
+                          boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+                          transition: 'all 0.3s ease'
+                        }}
+                      />
+                      
+                      {result.images.length > 1 && (
+                        <div style={{ 
+                          marginTop: '1rem', 
+                          display: 'flex', 
+                          gap: '10px', 
+                          justifyContent: 'center',
+                          overflowX: 'auto',
+                          padding: '10px 0'
+                        }}>
+                          {result.images.map((img, idx) => (
+                            <div 
+                              key={idx}
+                              onClick={() => setSelectedImageIndex(idx)}
+                              style={{ 
+                                width: '80px', 
+                                height: '80px', 
+                                borderRadius: '6px', 
+                                cursor: 'pointer',
+                                border: selectedImageIndex === idx ? '3px solid var(--accent)' : '2px solid transparent',
+                                overflow: 'hidden',
+                                transition: 'transform 0.2s',
+                                opacity: selectedImageIndex === idx ? 1 : 0.6
+                              }}
+                            >
+                              <img src={img} alt="Thumb" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 
                 {/* Clinical Notes Box */}
                 {result.clinical_data && (
