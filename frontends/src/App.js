@@ -64,28 +64,42 @@ const TScoreBar = ({ tScore }) => {
 
 const processBmdTable = async (imageFile) => {
   try {
-    const { data: { text } } = await Tesseract.recognize(imageFile, 'eng');
+    console.log("Starting local OCR with Tesseract.js...");
+    const { data: { text } } = await Tesseract.recognize(imageFile, 'eng', {
+      logger: m => console.log(m) // Log progress to console
+    });
+    console.log("OCR Text result:", text);
     const textContent = text.replace(/\n/g, ' ');
     
     const rows = [];
+    // More flexible regex to handle potential OCR artifacts and varying case/spacing
     const targetRegions = ['L1', 'L2', 'L3', 'L4', 'L1-L2', 'L1-L3', 'L1-L4', 'L2-L3', 'L2-L4', 'L3-L4'];
     
     targetRegions.forEach(region => {
-      // Regex equivalent to Python: r'\b' + region + r'\s+([+-]?\d+\.?\d*)[ \t]*([+-]?\d+\.?\d*)'
-      const regex = new RegExp(`\\b${region}\\s+([+-]?\\d+\\.?\\d*)[ \\t]*([+-]?\\d+\\.?\\d*)`);
+      // Improved regex: optional colon, flexible spaces, handles common OCR symbol misreads
+      const regionPattern = region.replace('-', '[\\-\\~\\s]');
+      const regex = new RegExp(`\\b${regionPattern}\\D*([\\+\\-]?\\d+[\\.\\,]?\\d*)[\\s\\|\\t]+([\\+\\-]?\\d+[\\.\\,]?\\d*)`, 'i');
       const match = textContent.match(regex);
+      
       if (match) {
+        const bmd = parseFloat(match[1].replace(',', '.'));
+        const tScore = parseFloat(match[2].replace(',', '.'));
+        console.log(`Matched ${region}: BMD=${bmd}, T-Score=${tScore}`);
         rows.push({
           Region: region,
-          BMD: parseFloat(match[1]),
-          T_Score: parseFloat(match[2]),
+          BMD: bmd,
+          T_Score: tScore,
           Z_Score: 'N/A'
         });
       }
     });
+
+    if (rows.length === 0) {
+      console.warn("No BMD regions were found in the OCR text.");
+    }
     return rows;
   } catch (err) {
-    console.error("OCR Error:", err);
+    console.error("Critical OCR Engine Error:", err);
     return null;
   }
 };
@@ -219,12 +233,15 @@ function App() {
 
     // Perform Local OCR if file is provided
     if (file) {
-      setLoading(true); // Ensure loading is on for OCR phase
+      setLoading(true);
+      setError("Running local OCR... Please wait.");
       const extracted = await processBmdTable(file);
+      setError(null);
+
       if (extracted && extracted.length > 0) {
         data.append('extracted_data', JSON.stringify(extracted));
       } else {
-        // If local OCR fails, we can either alert or let the backend try (but backend might OOM)
+        alert("Local OCR: Could not find the BMD table in this image. Please ensure the image shows the L1-L4 table clearly.");
         console.warn("Local OCR could not find standard table data. Backend will try to assist.");
       }
     }
