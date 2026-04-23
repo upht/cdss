@@ -49,7 +49,7 @@ def get_combined_features(img_path):
 
 def main():
     print("Loading data...")
-    dataset_path = r"c:\Users\L\Desktop\Normal-20260423T020516Z-3-001\OsterporosisUpDataset.csv"
+    dataset_path = r"OsterporosisUpDataset.csv"
     df = load_data(dataset_path)
     
     print(f"Total samples: {len(df)}")
@@ -100,7 +100,7 @@ def main():
     print(classification_report(y_test, y_pred, target_names=le.classes_))
     
     # Save the model and label encoder
-    model_path = r"c:\Users\L\Desktop\Normal-20260423T020516Z-3-001\osteo_model.pkl"
+    model_path = r"osteo_model.pkl"
     joblib.dump({"model": clf, "le": le}, model_path)
     print(f"Model saved to {model_path}")
 
