@@ -5,9 +5,10 @@ import {
   PieChart, Pie, Cell, 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
+import Tesseract from 'tesseract.js';
 import './App.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_URL = process.env.REACT_APP_API_URL || 'https://cdss-w8s6.onrender.com';
 
 const TScoreBar = ({ tScore }) => {
   const boundedScore = Math.min(Math.max(tScore, -5), 2);
@@ -59,6 +60,34 @@ const TScoreBar = ({ tScore }) => {
       </div>
     </div>
   );
+};
+
+const processBmdTable = async (imageFile) => {
+  try {
+    const { data: { text } } = await Tesseract.recognize(imageFile, 'eng');
+    const textContent = text.replace(/\n/g, ' ');
+    
+    const rows = [];
+    const targetRegions = ['L1', 'L2', 'L3', 'L4', 'L1-L2', 'L1-L3', 'L1-L4', 'L2-L3', 'L2-L4', 'L3-L4'];
+    
+    targetRegions.forEach(region => {
+      // Regex equivalent to Python: r'\b' + region + r'\s+([+-]?\d+\.?\d*)[ \t]*([+-]?\d+\.?\d*)'
+      const regex = new RegExp(`\\b${region}\\s+([+-]?\\d+\\.?\\d*)[ \\t]*([+-]?\\d+\\.?\\d*)`);
+      const match = textContent.match(regex);
+      if (match) {
+        rows.push({
+          Region: region,
+          BMD: parseFloat(match[1]),
+          T_Score: parseFloat(match[2]),
+          Z_Score: 'N/A'
+        });
+      }
+    });
+    return rows;
+  } catch (err) {
+    console.error("OCR Error:", err);
+    return null;
+  }
 };
 
 function App() {
@@ -187,6 +216,18 @@ function App() {
     if (gender) data.append('gender', gender);
     if (weight) data.append('weight', weight);
     if (height) data.append('height', height);
+
+    // Perform Local OCR if file is provided
+    if (file) {
+      setLoading(true); // Ensure loading is on for OCR phase
+      const extracted = await processBmdTable(file);
+      if (extracted && extracted.length > 0) {
+        data.append('extracted_data', JSON.stringify(extracted));
+      } else {
+        // If local OCR fails, we can either alert or let the backend try (but backend might OOM)
+        console.warn("Local OCR could not find standard table data. Backend will try to assist.");
+      }
+    }
 
     try {
       const response = await axios.post(`${API_URL}/predict`, data, {
