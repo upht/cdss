@@ -217,6 +217,18 @@ async def get_patient_data(patient_id: str):
                     "Z_Score": row.get('z_score', 'N/A')
                 })
             
+            all_images = []
+            try:
+                storage_prefix = f"{pt['label']}/{patient_id}"
+                list_resp = supabase.storage.from_("xrays").list(storage_prefix)
+                for f in list_resp:
+                    if f['name'].lower().endswith(('.png', '.jpg', '.jpeg')):
+                        img_url = supabase.storage.from_("xrays").get_public_url(f"{storage_prefix}/{f['name']}")
+                        all_images.append(img_url)
+            except Exception as e:
+                print(f"Error listing cloud images: {e}")
+                all_images = [pt['image_url']]
+
             diagnosis_obj = evaluate_who_criteria(min_t_score if min_t_score != float('inf') else 0)
             
             return {
@@ -229,7 +241,8 @@ async def get_patient_data(patient_id: str):
                 "clinical_data": None,
                 "clinical_notes": diagnosis_obj["clinical_notes"],
                 "criteria_used": "Database Record (Cloud Postgres)",
-                "preview_image": pt['image_url']
+                "preview_image": all_images[0] if all_images else pt['image_url'],
+                "images": all_images
             }
         else:
             if not os.path.exists(DATASET_CSV):
@@ -281,6 +294,19 @@ async def get_patient_data(patient_id: str):
                     "Z_Score": float(row['Z_Score']) if 'Z_Score' in row and str(row['Z_Score']) != 'N/A' else 'N/A'
                 })
                 
+            # Get all images in the folder
+            all_images = []
+            lbl = patient_rows.iloc[0]['label']
+            folder_path = os.path.join(BASE_DIR, lbl, str(patient_id))
+            if os.path.exists(folder_path):
+                for f in os.listdir(folder_path):
+                    if f.lower().endswith(('.png', '.jpg', '.jpeg')):
+                        ipath = os.path.join(folder_path, f)
+                        with open(ipath, "rb") as imf:
+                            b64 = base64.b64encode(imf.read()).decode('utf-8')
+                        mtype = "image/png" if f.lower().endswith(".png") else "image/jpeg"
+                        all_images.append(f"data:{mtype};base64,{b64}")
+
             diagnosis_obj = evaluate_who_criteria(min_t_score)
             
             return {
@@ -293,7 +319,8 @@ async def get_patient_data(patient_id: str):
                 "clinical_data": None,
                 "clinical_notes": diagnosis_obj["clinical_notes"],
                 "criteria_used": "Database Record (Local CSV)",
-                "preview_image": data_uri
+                "preview_image": all_images[0] if all_images else data_uri,
+                "images": all_images
             }
     except Exception as e:
         return {"error": str(e)}
