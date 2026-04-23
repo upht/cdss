@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 import subprocess
 import sys
 import gc
+import json
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATASET_CSV = os.path.join(BASE_DIR, "OsterporosisUpDataset.csv")
@@ -265,6 +266,7 @@ async def get_patient_data(patient_id: str):
 async def predict_risk(
     file: UploadFile = File(None),
     patient_id: str = Form(None),
+    extracted_data: str = Form(None), # New: Optional pre-extracted JSON from frontend
     age: str = Form(None),
     gender: str = Form(None),
     weight: str = Form(None),
@@ -272,6 +274,15 @@ async def predict_risk(
 ):
     try:
         filename = "Web Query.png"
+        rows = []
+
+        # 1. Use pre-extracted data if available (Saves RAM on Render)
+        if extracted_data:
+            try:
+                rows = json.loads(extracted_data)
+                print(f"✅ Using Pre-extracted Data ({len(rows)} rows)")
+            except:
+                pass
 
         if file:
             contents = await file.read()
@@ -312,20 +323,23 @@ async def predict_risk(
                     return {"error": "Failed to load local image."}
                 filename = os.path.basename(img_path)
         
-        # Temporary file for OCR
-        temp_dir = tempfile.gettempdir()
-        temp_path = os.path.join(temp_dir, "temp_bmd.png")
-        cv2.imwrite(temp_path, img)
-        
-        rows = process_table(temp_path)
-        # Aggressively clear OCR memory after use
-        if not supabase: # Keep it for local usage to speed up, but on Cloud we must clear
-             pass
-        else:
-             clear_reader() 
-             
+        # 2. Perform OCR only if NOT provided and NOT in restricted environment
         if not rows:
-            return {"error": "Could not extract standard spine T-scores from image."}
+            # Temporary file for OCR
+            temp_dir = tempfile.gettempdir()
+            temp_path = os.path.join(temp_dir, "temp_bmd.png")
+            cv2.imwrite(temp_path, img)
+            
+            try:
+                rows = process_table(temp_path)
+                # Aggressively clear OCR memory after use
+                if supabase: # If in Cloud (likely Render), clear immediately
+                    clear_reader() 
+            except Exception as e:
+                return {"error": f"OCR Engine Failure: {str(e)}. Try using a browser with latest JS enabled."}
+            
+        if not rows:
+            return {"error": "Could not extract standard spine T-scores from image. Please ensure the image contains a clear BMD table."}
             
         min_t_score = min([r["T_Score"] for r in rows])
         diagnosis_obj = evaluate_who_criteria(min_t_score, age, gender, weight, height)
