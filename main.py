@@ -15,6 +15,10 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 import subprocess
 import sys
+import gc
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATASET_CSV = os.path.join(BASE_DIR, "OsterporosisUpDataset.csv")
 
 # Load Envs for Cloud Compatibility (Supabase Integration)
 load_dotenv()
@@ -41,10 +45,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize OCR globally for fast inference (Disable GPU for headless Render deployment)
-reader = easyocr.Reader(['en'], gpu=False) 
+# Global reader variable set to None for lazy loading
+_reader = None
+
+def get_reader():
+    global _reader
+    if _reader is None:
+        # Load only when needed to save base memory
+        _reader = easyocr.Reader(['en'], gpu=False)
+    return _reader
+
+def clear_reader():
+    global _reader
+    _reader = None
+    gc.collect()
 
 def process_table(img_path):
+    reader = get_reader()
     result = reader.readtext(img_path, detail=0)
     text_content = " ".join(result)
     
@@ -135,8 +152,9 @@ async def get_stats():
                 "records": pts
             }
         else:
-            csv_path = r"c:\Users\L\Desktop\Normal-20260423T020516Z-3-001\OsterporosisUpDataset.csv"
-            df = pd.read_csv(csv_path)
+            if not os.path.exists(DATASET_CSV):
+                return {"summary": {"Normal": 0, "Osteopenia": 0, "Osteoporosis": 0}, "total": 0, "records": []}
+            df = pd.read_csv(DATASET_CSV)
             stats = df['label'].value_counts().to_dict()
             for label in ["Normal", "Osteopenia", "Osteoporosis"]:
                 if label not in stats:
@@ -185,21 +203,33 @@ async def get_patient_data(patient_id: str):
                 "preview_image": pt['image_url']
             }
         else:
-            csv_path = r"c:\Users\L\Desktop\Normal-20260423T020516Z-3-001\OsterporosisUpDataset.csv"
-            df = pd.read_csv(csv_path)
+            if not os.path.exists(DATASET_CSV):
+                return {"error": "Local Database not found"}
+            df = pd.read_csv(DATASET_CSV)
             patient_rows = df[df['patient_id'].astype(str) == str(patient_id)]
             
             if patient_rows.empty:
                 return {"error": "Patient not found in Local CSV"}
                 
             img_path = patient_rows.iloc[0]['image_path']
+            # If path was saved as absolute Windows path, try to resolve it relatively
+            if not os.path.exists(img_path):
+                # Fallback: check if it's in the current project structure
+                fname = os.path.basename(img_path)
+                # Looking for LABEL/ID/fname
+                lbl = patient_rows.iloc[0]['label']
+                img_path = os.path.join(BASE_DIR, lbl, str(patient_id), fname)
+
             with open(img_path, "rb") as image_file:
                 bg64_str = base64.b64encode(image_file.read()).decode('utf-8')
             mime_type = "image/png" if img_path.lower().endswith(".png") else "image/jpeg"
             data_uri = f"data:{mime_type};base64,{bg64_str}"
             
             bmd_csv = os.path.join(os.path.dirname(img_path), "bmd_spine.csv")
-            bmd_df = pd.read_csv(bmd_csv)
+            if os.path.exists(bmd_csv):
+                bmd_df = pd.read_csv(bmd_csv)
+            else:
+                return {"error": "BMD Data file not found for this patient."}
             
             extracted_data = []
             min_t_score = float('inf')
@@ -265,12 +295,18 @@ async def predict_risk(
                 nparr = np.frombuffer(resp.content, np.uint8)
                 img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             else:
-                csv_path = r"c:\Users\L\Desktop\Normal-20260423T020516Z-3-001\OsterporosisUpDataset.csv"
-                main_df = pd.read_csv(csv_path)
+                if not os.path.exists(DATASET_CSV):
+                    return {"error": "Local Database not found"}
+                main_df = pd.read_csv(DATASET_CSV)
                 patient_rows = main_df[main_df['patient_id'].astype(str) == str(patient_id)]
                 if patient_rows.empty:
                     return {"error": "Patient ID not found in Local Database."}
                 img_path = patient_rows.iloc[0]['image_path']
+                # Handle potential Windows absolute paths
+                if not os.path.exists(img_path):
+                     fname = os.path.basename(img_path)
+                     lbl = patient_rows.iloc[0]['label']
+                     img_path = os.path.join(BASE_DIR, lbl, str(patient_id), fname)
                 img = cv2.imread(img_path)
                 if img is None:
                     return {"error": "Failed to load local image."}
@@ -282,6 +318,12 @@ async def predict_risk(
         cv2.imwrite(temp_path, img)
         
         rows = process_table(temp_path)
+        # Aggressively clear OCR memory after use
+        if not supabase: # Keep it for local usage to speed up, but on Cloud we must clear
+             pass
+        else:
+             clear_reader() 
+             
         if not rows:
             return {"error": "Could not extract standard spine T-scores from image."}
             
@@ -326,9 +368,8 @@ async def predict_risk(
 
             else:
                 # Local CSV Fallback
-                csv_path = r"c:\Users\L\Desktop\Normal-20260423T020516Z-3-001\OsterporosisUpDataset.csv"
-                main_df = pd.read_csv(csv_path)
-                patient_dir = os.path.join(r"c:\Users\L\Desktop\Normal-20260423T020516Z-3-001", LABEL, patient_id)
+                main_df = pd.read_csv(DATASET_CSV)
+                patient_dir = os.path.join(BASE_DIR, LABEL, str(patient_id))
                 os.makedirs(patient_dir, exist_ok=True)
                 image_dest_path = os.path.join(patient_dir, filename)
                 cv2.imwrite(image_dest_path, img)
@@ -349,7 +390,7 @@ async def predict_risk(
                         'label': LABEL
                     }])
                     main_df = pd.concat([main_df, new_record], ignore_index=True)
-                main_df.to_csv(csv_path, index=False)
+                main_df.to_csv(DATASET_CSV, index=False)
         
         return {
             "patient_id": patient_id,
