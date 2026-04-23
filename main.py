@@ -18,8 +18,8 @@ import sys
 
 # Load Envs for Cloud Compatibility (Supabase Integration)
 load_dotenv()
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+SUPABASE_URL = os.environ.get("https://yjevprwtsvylltftjbld.supabase.co")
+SUPABASE_KEY = os.environ.get("sb_publishable_6qTixMdADM0g85sV-DuahQ__heLBJS5")
 
 supabase: Client = None
 if SUPABASE_URL and SUPABASE_KEY:
