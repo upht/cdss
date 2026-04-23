@@ -67,6 +67,21 @@ def clear_reader():
     _reader = None
     gc.collect()
 
+def find_image_in_folder(folder_path):
+    if not os.path.exists(folder_path):
+        return None
+    # Prioritize 'Web Query' if many images exist, otherwise take the first valid image
+    files = os.listdir(folder_path)
+    # Search for anything starting with 'Web Query' first
+    for f in files:
+        if f.lower().startswith('web query') and f.lower().endswith(('.png', '.jpg', '.jpeg')):
+            return os.path.join(folder_path, f)
+    # Fallback to any image
+    for f in files:
+        if f.lower().endswith(('.png', '.jpg', '.jpeg')):
+            return os.path.join(folder_path, f)
+    return None
+
 def process_table(img_path):
     reader = get_reader()
     if reader is None:
@@ -226,20 +241,21 @@ async def get_patient_data(patient_id: str):
                 return {"error": "Patient not found in Local CSV"}
                 
             img_path = patient_rows.iloc[0]['image_path']
-            # Robust extraction of filename from Windows OR Linux paths
-            filename = re.split(r'[\\/]', img_path)[-1]
             
             # If path was saved as absolute Windows path, try to resolve it relatively
             if not os.path.exists(img_path):
                 # Fallback: check if it's in the current project structure
-                # Looking for LABEL/ID/fname
+                # Looking for LABEL/ID/
                 lbl = patient_rows.iloc[0]['label']
-                img_path = os.path.join(BASE_DIR, lbl, str(patient_id), filename)
+                folder_path = os.path.join(BASE_DIR, lbl, str(patient_id))
+                found_path = find_image_in_folder(folder_path)
+                if found_path:
+                    img_path = found_path
+                else:
+                    return {"error": f"No image file (.png/.jpg) found in folder: {folder_path}"}
             
-            # Double check if file exists after fallback
             if not os.path.exists(img_path):
-                 # Try one more level: just search for the filename in the project
-                 return {"error": f"Image file not found at: {img_path}. Expected filename: {filename}"}
+                 return {"error": f"Image file not found at: {img_path}"}
 
             with open(img_path, "rb") as image_file:
                 bg64_str = base64.b64encode(image_file.read()).decode('utf-8')
@@ -333,16 +349,18 @@ async def predict_risk(
                 if patient_rows.empty:
                     return {"error": "Patient ID not found in Local Database."}
                 img_path = patient_rows.iloc[0]['image_path']
-                # Robust extraction of filename from Windows OR Linux paths
-                filename = re.split(r'[\\/]', img_path)[-1]
                 
                 # Handle potential Windows absolute paths
                 if not os.path.exists(img_path):
                      lbl = patient_rows.iloc[0]['label']
-                     img_path = os.path.join(BASE_DIR, lbl, str(patient_id), filename)
+                     folder_path = os.path.join(BASE_DIR, lbl, str(patient_id))
+                     found_path = find_image_in_folder(folder_path)
+                     if found_path:
+                         img_path = found_path
+                
                 img = cv2.imread(img_path)
                 if img is None:
-                    return {"error": "Failed to load local image."}
+                    return {"error": f"Failed to load image from path: {img_path}"}
                 filename = os.path.basename(img_path)
         
         # 2. Perform OCR only if NOT provided and NOT in restricted environment
